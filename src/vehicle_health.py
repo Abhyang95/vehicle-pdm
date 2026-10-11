@@ -97,7 +97,8 @@ def build_vehicle_health_history(
         ].copy()
 
         report = build_diagnostic_report(
-            telemetry_window
+            telemetry_window,
+            include_shap=False,
         )
 
         subsystem_history = {

@@ -170,6 +170,7 @@ def load_failure_feature_columns() -> list[str]:
 def build_diagnostic_report(
     telemetry_df: pd.DataFrame,
     top_k_shap: int = SHAP_TOP_K,
+    include_shap: bool = True,
 ) -> dict:
 
     if telemetry_df.empty:
@@ -267,43 +268,32 @@ def build_diagnostic_report(
             f"Expected {EXPECTED_FEATURE_COUNT}."
         )
 
+
     # --------------------------------------------------------
     # 5. SHAP explanation
     # --------------------------------------------------------
 
-    shap_df = explain_prediction(
-        failure_model,
-        X,
-        top_k=top_k_shap,
-    )
-
     shap_contributors = []
 
-    for _, row in shap_df.iterrows():
-
-        shap_contributors.append(
-            {
-                "feature": str(
-                    row["feature"]
-                ),
-                "impact": round(
-                    float(
-                        row["shap_value"]
-                    ),
-                    4,
-                ),
-                "absolute_impact": round(
-                    float(
-                        row["absolute_shap"]
-                    ),
-                    4,
-                ),
-                "direction": str(
-                    row["direction"]
-                ),
-            }
+    if include_shap:
+        shap_df = explain_prediction(
+            failure_model,
+            X,
+            top_k=top_k_shap,
         )
 
+        for _, row in shap_df.iterrows():
+            shap_contributors.append(
+                {
+                    "feature": str(row["feature"]),
+                    "impact": round(float(row["shap_value"]), 4),
+                    "absolute_impact": round(
+                        float(row["absolute_shap"]), 4
+                    ),
+                    "direction": str(row["direction"]),
+                    "description": str(row["feature"]),
+                }
+            )
     # --------------------------------------------------------
     # 6. Live subsystem health
     # --------------------------------------------------------

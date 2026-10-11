@@ -1,4 +1,5 @@
 from pathlib import Path
+from functools import lru_cache
 import json
 
 import joblib
@@ -45,7 +46,7 @@ def load_json(path: Path) -> dict:
     with open(path, "r", encoding="utf-8") as file:
         return json.load(file)
 
-
+@lru_cache(maxsize=1)
 def load_models():
     if not FAILURE_MODEL_PATH.exists():
         raise FileNotFoundError(
