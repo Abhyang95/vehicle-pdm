@@ -2,8 +2,7 @@
 from pathlib import Path
 from typing import List, Dict
 
-import chromadb
-from sentence_transformers import SentenceTransformer
+
 
 
 # ============================================================
@@ -45,7 +44,8 @@ class KnowledgeRetriever:
                 "Vectorstore directory not found: "
                 f"{self.vectorstore_dir}"
             )
-
+        import chromadb
+        from sentence_transformers import SentenceTransformer
         self.client = chromadb.PersistentClient(
             path=str(self.vectorstore_dir)
         )

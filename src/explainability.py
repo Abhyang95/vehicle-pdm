@@ -2,7 +2,7 @@ from pathlib import Path
 
 import joblib
 import pandas as pd
-import shap
+
 
 
 # ============================================================
@@ -87,7 +87,7 @@ def explain_prediction(
         raise ValueError(
             "Cannot explain an empty feature matrix."
         )
-
+    import shap
     explainer = shap.TreeExplainer(model)
 
     shap_values = explainer.shap_values(X)
