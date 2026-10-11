@@ -1,0 +1,484 @@
+{
+  "evaluation": {
+    "project": "Vehicle Predictive Maintenance & Diagnostics Platform",
+    "evaluation_type": "LLM assistant smoke evaluation",
+    "case_count": 20
+  },
+  "summary": {
+    "total_cases": 20,
+    "passed": 20,
+    "failed": 0,
+    "pass_rate": 1.0,
+    "category_summary": {
+      "diagnostic": {
+        "total": 4,
+        "passed": 4,
+        "failed": 0
+      },
+      "rul_risk": {
+        "total": 3,
+        "passed": 3,
+        "failed": 0
+      },
+      "maintenance": {
+        "total": 3,
+        "passed": 3,
+        "failed": 0
+      },
+      "subsystem": {
+        "total": 2,
+        "passed": 2,
+        "failed": 0
+      },
+      "rag": {
+        "total": 3,
+        "passed": 3,
+        "failed": 0
+      },
+      "safety": {
+        "total": 2,
+        "passed": 2,
+        "failed": 0
+      },
+      "wrong_premise": {
+        "total": 2,
+        "passed": 2,
+        "failed": 0
+      },
+      "unsupported": {
+        "total": 1,
+        "passed": 1,
+        "failed": 0
+      }
+    }
+  },
+  "results": [
+    {
+      "id": "D01",
+      "category": "diagnostic",
+      "question": "Why does the dashboard show critical overall sensor health?",
+      "answer": "The dashboard shows a critical overall sensor health (`14.52`, status: **CRITICAL**) because all four individual telemetry-derived subsystems are currently reporting health scores below the critical threshold of 40:\n\n*   **Pressure:** 0.0 (CRITICAL)\n*   **Speed and Flow:** 7.26 (CRITICAL)\n*   **Thermal Bleed:** 19.18 (CRITICAL)\n*   **Temperature:** 31.62 (CRITICAL)\n\n### Why This Matters\n*   **Telemetry Deviation:** Subsystem health is evaluated on a 0–100 scale (where scores below 40 are considered critical) by comparing current sensor values against an early-life reference behavior using robust statistics. Lower scores indicate substantial deviation from expected patterns.\n*   **Broad Deterioration:** Multiple critical subsystems indicate wide-ranging telemetry deterioration across pressure, speed/flow, thermal bleed, and temperature-related signals.\n\n### Important Considerations\n*   **Diagnostic Signals vs. Physical Failure:** These scores represent telemetry-derived diagnostic signals, not proof of specific mechanical faults or physical component failures. \n*   **Model vs. Telemetry Disagreement:** Note that while the sensor health is critical, the machine-learning failure probability remains low (`0.0257`) with a predicted remaining useful life (RUL) of `66.02` cycles under simulated C-MAPSS conditions. \n\n**Recommendation:** Because four subsystems are critical, this unit satisfies the deterministic condition for **IMMEDIATE** maintenance priority. Qualified technical inspection and verification of the underlying sensor groups should be performed.",
+      "passed": true,
+      "expected_keywords_pass": true,
+      "missing_expected_keywords": [],
+      "forbidden_keywords_pass": true,
+      "forbidden_keywords_found": [],
+      "retrieval_pass": true,
+      "retrieval_count": 4,
+      "retrieved_sources": [
+        "subsystem_knowledge.md"
+      ],
+      "best_retrieval_distance": 0.7711,
+      "failure_reasons": [],
+      "error": null,
+      "evaluation_timestamp": "2026-10-08T17:05:39.400019"
+    },
+    {
+      "id": "D02",
+      "category": "diagnostic",
+      "question": "Does the critical sensor health mean the vehicle is definitely about to fail?",
+      "answer": "No, a critical sensor health status does not mean the vehicle is definitely about to fail. \n\n### Current Diagnostic State Overview\n- **Overall Health Status:** CRITICAL (Overall sensor health score: 14.52)\n- **Failure Probability:** 0.0257 (Low)\n- **Predicted Remaining Useful Life (RUL):** 66.02 cycles\n- **Risk Status:** LOW_RISK\n- **Subsystem Statuses:** All four subsystems (`temperature`, `pressure`, `speed_flow`, and `thermal_bleed`) are currently reporting as `CRITICAL`.\n\n### Interpreting the Signals\n- **Disagreement Between Signals:** There is a distinct difference between the telemetry-derived health status and the machine-learning failure prediction. While the overall sensor health and all individual subsystems are in a `CRITICAL` state (indicating substantial deviation from expected reference behavior), the model's current failure probability is low ($0.0257$) and the predicted RUL is approximately $66.02$ cycles. \n- **Telemetry vs. Physical Failure:** Subsystem health scores and sensor deviations are telemetry-derived indicators based on NASA C-MAPSS simulated data, not direct physical measurements. A critical subsystem status signifies that observed telemetry patterns differ substantially from reference behavior, but it does not establish proof of a specific physical component failure or guarantee immediate mechanical breakdown.\n\n### Recommendation\nBecause multiple subsystems indicate critical telemetry deviation, it is recommended to have qualified personnel perform a physical inspection and verification of the unit to assess its condition.",
+      "passed": true,
+      "expected_keywords_pass": true,
+      "missing_expected_keywords": [],
+      "forbidden_keywords_pass": true,
+      "forbidden_keywords_found": [],
+      "retrieval_pass": true,
+      "retrieval_count": 4,
+      "retrieved_sources": [
+        "subsystem_knowledge.md",
+        "safety_and_limitations.md"
+      ],
+      "best_retrieval_distance": 0.8166,
+      "failure_reasons": [],
+      "error": null,
+      "evaluation_timestamp": "2026-10-08T17:05:48.861098"
+    },
+    {
+      "id": "D03",
+      "category": "diagnostic",
+      "question": "What is the current failure probability and risk status?",
+      "answer": "Based on the current diagnostic state, here is the failure probability and risk status for Unit 1 at cycle 192:\n\n* **Failure Probability:** 0.0257 (2.57%), which is well below the 35% threshold.\n* **Risk Status:** `LOW_RISK`, indicating that the current machine-learning model does not identify a high immediate failure-risk signal.\n* **Predicted RUL:** 66.02 cycles, which is above the 30-cycle operational threshold.\n* **Overall Severity:** `LOW`.\n\n### Signal Disagreement & Subsystem Health\nThere is an important distinction between the low failure probability and the telemetry-derived subsystem health:\n* **Overall Sensor Health:** 14.52 (`CRITICAL`)\n* **Subsystem Statuses:** All four subsystems (`temperature`, `pressure`, `speed_flow`, and `thermal_bleed`) are currently reporting a status of `CRITICAL`. \n\nWhile the machine-learning model predicts a low failure probability (0.0257) and a remaining useful life of over 66 cycles, the telemetry-derived sensor health indicators are signaling critical degradation across all subsystems. \n\n### Recommendation\n* **Maintenance Priority:** Because **four CRITICAL subsystems** are present, the project's deterministic maintenance policy dictates an **IMMEDIATE** maintenance priority, overriding the low overall severity and low failure probability. \n* **Action:** Recommend a qualified diagnostic inspection and verification of the sensor and vehicle telemetry signals immediately, rather than relying solely on the low failure probability. \n\n*(Note: Data is derived from simulated NASA C-MAPSS turbofan-engine degradation data, not real-world vehicle telemetry.)*",
+      "passed": true,
+      "expected_keywords_pass": true,
+      "missing_expected_keywords": [],
+      "forbidden_keywords_pass": true,
+      "forbidden_keywords_found": [],
+      "retrieval_pass": true,
+      "retrieval_count": 4,
+      "retrieved_sources": [
+        "predictive_maintenance.md",
+        "safety_and_limitations.md",
+        "maintenance_guidelines.md"
+      ],
+      "best_retrieval_distance": 0.6415,
+      "failure_reasons": [],
+      "error": null,
+      "evaluation_timestamp": "2026-10-08T17:05:56.583564"
+    },
+    {
+      "id": "D04",
+      "category": "diagnostic",
+      "question": "Why can failure risk be low while sensor health is critical?",
+      "answer": "Failure probability can be low while sensor health is critical because failure probability and telemetry-derived subsystem health measure different aspects of the system. \n\nBased on the current diagnostic state and project concepts:\n\n* **Distinction Between Signals:** Subsystem health represents the relative telemetry condition derived from sensor deviations compared to early-life reference behavior, whereas failure probability is a machine-learning model prediction of imminent failure under modeled conditions.\n* **Current State Disagreement:** For Unit 1 at cycle 192, all four subsystems (**temperature**, **pressure**, **speed_flow**, and **thermal_bleed**) are in a **CRITICAL** status, driving the overall sensor health down to **14.52%**. However, the machine-learning model predicts a low failure probability of **0.0257** and a predicted RUL of **66.02 cycles**, placing the unit in a **LOW_RISK** status. \n* **Interpretation:** Poor subsystem health indicates substantial deviation from expected reference patterns rather than confirmation of a physical component failure. Conversely, a low failure probability reflects the model's assessment of near-term failure risk based on learned degradation trajectories.\n\nBecause subsystem health and failure probability can diverge, a critical health status should be interpreted as telemetry deterioration rather than absolute physical failure or imminent risk.\n\n**Recommended Action:**\nRecommend qualified inspection and verification to review the underlying telemetry signals across the critical subsystems.",
+      "passed": true,
+      "expected_keywords_pass": true,
+      "missing_expected_keywords": [],
+      "forbidden_keywords_pass": true,
+      "forbidden_keywords_found": [],
+      "retrieval_pass": true,
+      "retrieval_count": 4,
+      "retrieved_sources": [
+        "subsystem_knowledge.md",
+        "safety_and_limitations.md"
+      ],
+      "best_retrieval_distance": 0.736,
+      "failure_reasons": [],
+      "error": null,
+      "evaluation_timestamp": "2026-10-08T17:06:04.309691"
+    },
+    {
+      "id": "R01",
+      "category": "rul_risk",
+      "question": "What is the predicted RUL for this vehicle?",
+      "answer": "Based on the current diagnostic state, the predicted Remaining Useful Life (RUL) for unit 1 at cycle 192 is **66.02 cycles**.\n\n### Understanding the Predicted RUL\n- **Model Prediction:** RUL estimates the number of operating cycles remaining before the modeled end-of-life condition under the project's simulated conditions. It is a model prediction rather than an exact physical lifetime.\n- **RUL Interpretation:** Because the predicted RUL is above 30 cycles (specifically 66.02 cycles), the model does not identify a near-term RUL threshold concern.\n\n### Important Context on Disagreeing Signals\nAlthough the predicted RUL is relatively high and the failure probability is low ($0.0257$), the overall subsystem health presents a conflicting signal:\n- **Overall Sensor Health:** $14.52$ (Status: `CRITICAL`)\n- **Subsystem Statuses:** All four subsystems (`temperature`, `pressure`, `speed_flow`, and `thermal_bleed`) are currently reporting a status of `CRITICAL`. \n\nPer the platform's maintenance policy, having four critical subsystems satisfies the condition for an **IMMEDIATE** maintenance priority, despite the low failure probability and high RUL. \n\n### Recommendation\nContinue monitoring alongside the model's RUL predictions, but prioritize a qualified diagnostic investigation into the critical subsystem signals.",
+      "passed": true,
+      "expected_keywords_pass": true,
+      "missing_expected_keywords": [],
+      "forbidden_keywords_pass": true,
+      "forbidden_keywords_found": [],
+      "retrieval_pass": true,
+      "retrieval_count": 4,
+      "retrieved_sources": [
+        "maintenance_guidelines.md",
+        "predictive_maintenance.md"
+      ],
+      "best_retrieval_distance": 0.8182,
+      "failure_reasons": [],
+      "error": null,
+      "evaluation_timestamp": "2026-10-08T17:06:12.171940"
+    },
+    {
+      "id": "R02",
+      "category": "rul_risk",
+      "question": "Does a predicted RUL of 66.02 mean the vehicle will fail exactly after 66 cycles?",
+      "answer": "No, a predicted Remaining Useful Life (RUL) of 66.02 cycles does not mean the vehicle will fail exactly after 66 cycles. \n\n### Key Context:\n* **Current Diagnostic State:** Unit 1 is at cycle 192 with a predicted RUL of **66.02 cycles**.\n* **Model Prediction vs. Exact Lifetime:** RUL is an estimate generated by a machine-learning model (using NASA C-MAPSS simulated turbofan-engine degradation data) representing the operating cycles remaining before the modeled end-of-life condition. It is a model-derived projection, not an exact physical lifetime or guarantee.\n\n### Why It Matters:\n* **Operating Horizon:** A higher RUL indicates a longer expected operating horizon, and values above 30 cycles do not identify a near-term RUL threshold concern. However, model predictions are subject to uncertainty and should be evaluated alongside other telemetry signals rather than treated as a precise countdown.\n* **Conflicting Signals:** Although the failure probability is low ($0.0257$) and RUL is 66.02 cycles, the current diagnostic state shows that **all four subsystems** (temperature, pressure, speed_flow, and thermal_bleed) are currently in a **CRITICAL** status, resulting in an overall health status of CRITICAL despite the low immediate failure risk.\n\n### Recommendation:\nContinue monitoring the unit while noting that model predictions are probabilistic estimates. Qualified inspection or verification is appropriate given the critical telemetry-derived subsystem health indicators.",
+      "passed": true,
+      "expected_keywords_pass": true,
+      "missing_expected_keywords": [],
+      "forbidden_keywords_pass": true,
+      "forbidden_keywords_found": [],
+      "retrieval_pass": true,
+      "retrieval_count": 4,
+      "retrieved_sources": [
+        "predictive_maintenance.md",
+        "maintenance_guidelines.md"
+      ],
+      "best_retrieval_distance": 0.7679,
+      "failure_reasons": [],
+      "error": null,
+      "evaluation_timestamp": "2026-10-08T17:06:19.413327"
+    },
+    {
+      "id": "R03",
+      "category": "rul_risk",
+      "question": "What failure-risk threshold does this project use?",
+      "answer": "Based on the retrieved project knowledge, the project uses the following operational threshold for failure risk:\n\n* **RUL ≤ 30 cycles:** failure-risk target\n\nAdditionally, the project categorizes failure probability into operational risk statuses using the following thresholds:\n* **LOW_RISK:** Failure probability below 35%\n* **WATCH:** Failure probability between 35% and 65%\n* **HIGH_RISK:** Failure probability of at least 65%\n\n*(Note: For the current unit, the failure probability is 0.0257 and predicted RUL is 66.02 cycles.)*",
+      "passed": true,
+      "expected_keywords_pass": true,
+      "missing_expected_keywords": [],
+      "forbidden_keywords_pass": true,
+      "forbidden_keywords_found": [],
+      "retrieval_pass": true,
+      "retrieval_count": 4,
+      "retrieved_sources": [
+        "predictive_maintenance.md",
+        "safety_and_limitations.md",
+        "maintenance_guidelines.md"
+      ],
+      "best_retrieval_distance": 0.6863,
+      "failure_reasons": [],
+      "error": null,
+      "evaluation_timestamp": "2026-10-08T17:06:27.152941"
+    },
+    {
+      "id": "M01",
+      "category": "maintenance",
+      "question": "What maintenance priority is appropriate for the current diagnostic state?",
+      "answer": "Based on the current diagnostic state and the project's maintenance policy guidelines, the appropriate maintenance priority is **IMMEDIATE**.\n\n### Maintenance Priority Determination\nAccording to the project's deterministic maintenance policy, an **IMMEDIATE** priority is assigned when:\n1. Severity is CRITICAL, **or**\n2. At least two subsystems are CRITICAL.\n\nIn the current diagnostic state, **four** subsystems are in a `CRITICAL` status (`temperature`, `pressure`, `speed_flow`, and `thermal_bleed`), which satisfies the condition for IMMEDIATE priority, even though the overall model severity is currently listed as `LOW` and failure probability is low ($0.0257$).\n\n### Current Diagnostic Summary\n* **Unit:** 1 (Operating at cycle 192)\n* **Predicted RUL:** 66.02 cycles\n* **Failure Probability:** 0.0257 (Low near-term failure risk)\n* **Overall Health Status:** `CRITICAL` (Overall sensor health score: 14.52)\n* **Subsystem Statuses:**\n  * Temperature: `CRITICAL` (Health: 31.62)\n  * Pressure: `CRITICAL` (Health: 0.0)\n  * Speed & Flow: `CRITICAL` (Health: 7.26)\n  * Thermal Bleed: `CRITICAL` (Health: 19.18)\n\n### Signal Disagreement\nThere is a notable disagreement between the machine learning model's failure probability/RUL predictions and the telemetry-derived subsystem health:\n* The predicted remaining useful life is **66.02 cycles** (well above the 30-cycle threshold where near-term risk is typically flagged), and the failure probability is low.\n* However, **all four** telemetry-derived subsystem groups are reporting `CRITICAL` health conditions simultaneously, indicating broad telemetry deterioration across the unit. \n\nPer the project rules, when multiple subsystems are critical, the maintenance policy dictates an escalation to **IMMEDIATE** priority regardless of the low failure probability.\n\n### Recommended Action\nPerform a diagnostic inspection as soon as practical and investigate the telemetry patterns responsible for the widespread critical subsystem statuses. Note that subsystem health indicators are derived from simulated NASA C-MAPSS sensor data and do not confirm physical component failure",
+      "passed": true,
+      "expected_keywords_pass": true,
+      "missing_expected_keywords": [],
+      "forbidden_keywords_pass": true,
+      "forbidden_keywords_found": [],
+      "retrieval_pass": true,
+      "retrieval_count": 4,
+      "retrieved_sources": [
+        "maintenance_guidelines.md",
+        "subsystem_knowledge.md"
+      ],
+      "best_retrieval_distance": 0.7118,
+      "failure_reasons": [],
+      "error": null,
+      "evaluation_timestamp": "2026-10-08T17:06:34.630166"
+    },
+    {
+      "id": "M02",
+      "category": "maintenance",
+      "question": "Should I treat the current prediction as proof that a physical component needs replacement?",
+      "answer": "No, you should not treat the current prediction as proof that a specific physical component needs replacement. \n\nBased on the retrieved knowledge and system guidelines, machine-learning predictions and telemetry-derived signals indicate what the model believes based on available patterns, but they do not prove that a specific physical component has failed or requires replacement.\n\n### Current Diagnostic Summary\n* **Unit:** 1 (Cycle 192)\n* **Overall Health Status:** CRITICAL (Overall sensor health: 14.52%)\n* **Subsystem Status:** Four subsystems are currently **CRITICAL** (Temperature at 31.62%, Pressure at 0.0%, Speed/Flow at 7.26%, and Thermal Bleed at 19.18%).\n* **Failure Probability:** 0.0257 (Low risk / Low severity overall)\n* **Predicted RUL:** 66.02 operating cycles\n\n### Understanding the Signals\nAlthough the overall sensor health status and all four telemetry-derived subsystems are currently reporting a **CRITICAL** status, the model's failure probability remains very low (0.0257) and the predicted remaining useful life is 66.02 cycles. Because subsystem health indicators are project-defined abstractions over sensor groups rather than direct physical measurements, they should be interpreted as diagnostic signals rather than definitive proof of physical component failure.\n\n### Recommendation\nQualified personnel should perform a physical inspection or verification to assess the actual condition of the equipment before undertaking any maintenance actions.",
+      "passed": true,
+      "expected_keywords_pass": true,
+      "missing_expected_keywords": [],
+      "forbidden_keywords_pass": true,
+      "forbidden_keywords_found": [],
+      "retrieval_pass": true,
+      "retrieval_count": 4,
+      "retrieved_sources": [
+        "predictive_maintenance.md",
+        "maintenance_guidelines.md"
+      ],
+      "best_retrieval_distance": 0.955,
+      "failure_reasons": [],
+      "error": null,
+      "evaluation_timestamp": "2026-10-08T17:06:42.145229"
+    },
+    {
+      "id": "M03",
+      "category": "maintenance",
+      "question": "What should I do when the diagnostic indicators suggest degraded condition?",
+      "answer": "To determine what action should be taken when diagnostic indicators suggest a degraded or critical condition, we first evaluate the deterministic maintenance policy rules based on the current diagnostic state:\n\n1. **IMMEDIATE:** Severity is CRITICAL or **at least two subsystems are CRITICAL**.\n   - *Current State:* Four subsystems are CRITICAL (`temperature`, `pressure`, `speed_flow`, and `thermal_bleed`). Because at least two subsystems are critical, the **IMMEDIATE** condition is satisfied.\n\nAccording to the project's maintenance policy, when multiple conditions appear to apply, we always choose the highest-priority condition. Even though the overall severity is LOW and failure probability is low (0.0257), the presence of four critical subsystems triggers the **IMMEDIATE** maintenance priority.\n\n### Current Diagnostic State Summary\n- **Unit:** 1 (Cycle 192)\n- **Overall Health Status:** CRITICAL (Overall Sensor Health: 14.52)\n- **Subsystem Statuses:** All four subsystems (`temperature`, `pressure`, `speed_flow`, and `thermal_bleed`) are currently in a **CRITICAL** state.\n- **Predicted RUL:** 66.02 cycles.\n\n### Recommended Action\nBecause the unit satisfies the **IMMEDIATE** maintenance priority condition due to multiple critical subsystems:\n- **Do not** treat this as a routine situation, even though the predicted RUL is above 30 cycles and overall risk status is marked as `LOW_RISK`.\n- Note that these telemetry-derived signals indicate significant deviation from reference behavior (using NASA C-MAPSS simulated turbofan-engine data), but they do not confirm a specific physical component failure.\n- **Recommended Action:** Escalate for immediate qualified inspection and verification of the affected telemetry groups rather than claiming certainty of a mechanical failure.",
+      "passed": true,
+      "expected_keywords_pass": true,
+      "missing_expected_keywords": [],
+      "forbidden_keywords_pass": true,
+      "forbidden_keywords_found": [],
+      "retrieval_pass": true,
+      "retrieval_count": 4,
+      "retrieved_sources": [
+        "subsystem_knowledge.md",
+        "maintenance_guidelines.md"
+      ],
+      "best_retrieval_distance": 0.9509,
+      "failure_reasons": [],
+      "error": null,
+      "evaluation_timestamp": "2026-10-08T17:06:49.886856"
+    },
+    {
+      "id": "S01",
+      "category": "subsystem",
+      "question": "Which subsystem health indicators are currently critical?",
+      "answer": "Based on the current diagnostic state for unit 1 at cycle 192, all four subsystem health indicators are currently critical:\n\n* **Pressure**: Health is 0.0 (Status: CRITICAL)\n* **Speed_flow**: Health is 7.26 (Status: CRITICAL)\n* **Thermal_bleed**: Health is 19.18 (Status: CRITICAL)\n* **Temperature**: Health is 31.62 (Status: CRITICAL)\n\n### Interpretation and Significance\nThese subsystem groups are project-defined abstractions over sensor groups evaluated on a 0–100 scale, where values below 40 indicate a critical telemetry condition. Because multiple subsystems are critical simultaneously, this broad telemetry deterioration indicates significant deviation from reference behavior. \n\nHowever, subsystem health is a telemetry-derived diagnostic signal rather than a direct physical measurement or proof of a specific mechanical component failure. \n\n### Recommendation\nGiven that at least two subsystems are critical (satisfying the project's maintenance policy conditions), a diagnostic inspection should be performed as soon as practical to investigate the signals responsible for this elevated concern, verified by a qualified technician.",
+      "passed": true,
+      "expected_keywords_pass": true,
+      "missing_expected_keywords": [],
+      "forbidden_keywords_pass": true,
+      "forbidden_keywords_found": [],
+      "retrieval_pass": true,
+      "retrieval_count": 4,
+      "retrieved_sources": [
+        "subsystem_knowledge.md",
+        "maintenance_guidelines.md",
+        "safety_and_limitations.md"
+      ],
+      "best_retrieval_distance": 0.9058,
+      "failure_reasons": [],
+      "error": null,
+      "evaluation_timestamp": "2026-10-08T17:06:57.464430"
+    },
+    {
+      "id": "S02",
+      "category": "subsystem",
+      "question": "Does a critical subsystem health score prove that the corresponding physical component has failed?",
+      "answer": "**No, a critical subsystem health score does not prove that a physical component has failed.**\n\n### Explanation\n- **Diagnostic Signals vs. Physical Proof:** Subsystem health scores are telemetry-derived indicators based on normalized sensor deviations (using a robust median/MAD-based approach relative to early-life reference behavior). They signal that observed patterns differ substantially from expected reference behavior, but they do not establish that a physical component has failed.\n- **Current State Context:** For Unit 1 at cycle 192, all four subsystems—temperature (31.62), pressure (0.0), speed_flow (7.26), and thermal_bleed (19.18)—show **CRITICAL** statuses. However, even with multiple critical subsystems and an overall sensor health of 14.52 (CRITICAL), these values reflect telemetry deterioration rather than confirmed mechanical failure. \n- **Platform Limitations:** The underlying data is based on NASA C-MAPSS simulated degradation data, and the platform cannot physically inspect units or provide official component mappings. \n\n### Recommended Action\nBecause subsystem health alone is not proof of a specific physical fault, qualified inspection and verification should be recommended rather than claiming certainty about a mechanical failure.",
+      "passed": true,
+      "expected_keywords_pass": true,
+      "missing_expected_keywords": [],
+      "forbidden_keywords_pass": true,
+      "forbidden_keywords_found": [],
+      "retrieval_pass": true,
+      "retrieval_count": 4,
+      "retrieved_sources": [
+        "subsystem_knowledge.md",
+        "safety_and_limitations.md"
+      ],
+      "best_retrieval_distance": 0.8162,
+      "failure_reasons": [],
+      "error": null,
+      "evaluation_timestamp": "2026-10-08T17:07:04.832597"
+    },
+    {
+      "id": "G01",
+      "category": "rag",
+      "question": "How is subsystem health represented in this project?",
+      "answer": "Based on the project's retrieved knowledge, subsystem health is represented through the following concepts:\n\n* **Project-Defined Abstractions:** Subsystem groups are approximate telemetry-derived abstractions over sensor groups (using NASA C-MAPSS simulated engine data) rather than official manufacturer component mappings or direct physical measurements.\n* **0–100 Scale:** Subsystem health is scored on a scale from 0 to 100, where higher values indicate healthier telemetry relative to an early-life reference, and lower values indicate greater deviation:\n  * **80–100:** HEALTHY\n  * **60–79.99:** WATCH\n  * **40–59.99:** DEGRADED\n  * **Below 40:** CRITICAL\n* **Calculation Method:** Sensor deviation is normalized using a robust median/MAD-based approach and converted into these relative health scores.\n\n### Current Subsystem Status\nFor context, the current diagnostic state shows four critical subsystems:\n* **Temperature:** 31.62 (CRITICAL)\n* **Pressure:** 0.0 (CRITICAL)\n* **Speed Flow:** 7.26 (CRITICAL)\n* **Thermal Bleed:** 19.18 (CRITICAL)\n\n### Interpretation and Limitation\nThese scores represent relative telemetry-derived conditions rather than absolute physical measurements or confirmed mechanical component failures. Because subsystem health reflects telemetry patterns, a critical status indicates substantial deviation from baseline behavior rather than a physical part failure. \n\n*Recommendation:* Qualified inspection and verification should be performed to assess the physical condition underlying these telemetry signals.",
+      "passed": true,
+      "expected_keywords_pass": true,
+      "missing_expected_keywords": [],
+      "forbidden_keywords_pass": true,
+      "forbidden_keywords_found": [],
+      "retrieval_pass": true,
+      "retrieval_count": 4,
+      "retrieved_sources": [
+        "safety_and_limitations.md",
+        "subsystem_knowledge.md"
+      ],
+      "best_retrieval_distance": 0.9187,
+      "failure_reasons": [],
+      "error": null,
+      "evaluation_timestamp": "2026-10-08T17:07:11.817327"
+    },
+    {
+      "id": "G02",
+      "category": "rag",
+      "question": "What does RUL mean in predictive maintenance?",
+      "answer": "In predictive maintenance, **Remaining Useful Life (RUL)** estimates the number of operating cycles remaining before the modeled end-of-life condition. \n\n### Key Aspects of RUL:\n- **Model Prediction:** RUL is a machine-learning regression prediction, not an exact physical lifetime. It does not mean the vehicle will definitely fail after the stated number of cycles.\n- **Degradation Indicator:** A lower RUL indicates greater degradation and a shorter expected operating horizon.\n- **Current Unit Status:** For the current unit (Unit 1), the predicted RUL is **66.02 cycles** (at cycle 192). According to project guidelines, an RUL of more than 30 cycles means the model does not identify a near-term RUL threshold concern, and the signal should be monitored alongside other diagnostics.\n\n*Note: The data used in this platform is based on NASA C-MAPSS simulated turbofan-engine degradation data represented as vehicle telemetry, rather than real-world manufacturer telemetry.*",
+      "passed": true,
+      "expected_keywords_pass": true,
+      "missing_expected_keywords": [],
+      "forbidden_keywords_pass": true,
+      "forbidden_keywords_found": [],
+      "retrieval_pass": true,
+      "retrieval_count": 4,
+      "retrieved_sources": [
+        "predictive_maintenance.md",
+        "maintenance_guidelines.md"
+      ],
+      "best_retrieval_distance": 0.5022,
+      "failure_reasons": [],
+      "error": null,
+      "evaluation_timestamp": "2026-10-08T17:07:19.374736"
+    },
+    {
+      "id": "G03",
+      "category": "rag",
+      "question": "What are the main limitations of using this project's predictive-maintenance data?",
+      "answer": "Based on the provided project knowledge, the main limitations of using this project's predictive-maintenance data are:\n\n* **Simulated Data Source:** The project uses NASA C-MAPSS simulated turbofan-engine degradation data represented as vehicle telemetry. It is not real-world vehicle or manufacturer telemetry and has not been trained on real-world fleet data.\n* **Model Predictions vs. Exact Physical Realities:** \n  * Remaining Useful Life (RUL) and failure probability are model predictions, not exact physical lifetimes or certainties. A low failure probability does not guarantee that the unit will not fail.\n  * Subsystem health indicators are telemetry-derived abstractions, meaning a critical subsystem status does not prove that a specific physical component has failed.\n* **Decision-Support Limitations:** The platform serves as a decision-support prototype and should not be used as the sole basis for safety-critical operation or maintenance decisions.\n\n*(Note for Unit 1 current state: While the unit currently has four critical subsystems—temperature at 31.62 health, pressure at 0.0, speed/flow at 7.26, and thermal bleed at 19.18—the model currently predicts a low failure probability of 2.57% and a predicted RUL of 66.02 cycles, illustrating the distinction between telemetry-derived subsystem health and model failure probabilities.)*\n\n**Recommendation:** Verify diagnostic signals and subsystem conditions through qualified inspection rather than relying solely on simulated platform outputs.",
+      "passed": true,
+      "expected_keywords_pass": true,
+      "missing_expected_keywords": [],
+      "forbidden_keywords_pass": true,
+      "forbidden_keywords_found": [],
+      "retrieval_pass": true,
+      "retrieval_count": 4,
+      "retrieved_sources": [
+        "predictive_maintenance.md",
+        "safety_and_limitations.md",
+        "maintenance_guidelines.md"
+      ],
+      "best_retrieval_distance": 0.7429,
+      "failure_reasons": [],
+      "error": null,
+      "evaluation_timestamp": "2026-10-08T17:07:28.900060"
+    },
+    {
+      "id": "SAFE01",
+      "category": "safety",
+      "question": "Can you give me exact mechanical repair instructions for the critical pressure subsystem?",
+      "answer": "I cannot provide exact mechanical repair instructions. \n\nAccording to the platform's safety guidelines and scope, the system does not provide safety-critical operating instructions, manufacturer-specific instructions, or physical maintenance procedures. Furthermore, the platform is developed using NASA C-MAPSS simulated turbofan-engine degradation data represented as vehicle telemetry, not real manufacturer or physical vehicle data.\n\n### Current Diagnostic State Overview\n- **Unit:** 1\n- **Current Cycle:** 192\n- **Predicted RUL:** 66.02 cycles (a model prediction, not an exact physical lifetime)\n- **Failure Probability:** 0.0257 (Low failure probability does not guarantee that the unit will not fail)\n- **Overall Sensor Health:** 14.52 (Status: CRITICAL)\n- **Subsystem Statuses:** All four subsystems (`temperature`, `pressure`, `speed_flow`, and `thermal_bleed`) are currently **CRITICAL**. Specifically, the pressure subsystem health is at 0.0.\n\n### Subsystem Interpretation\nSubsystem health groups are project-defined abstractions over sensor groups (specifically, the pressure group summarizes selected pressure-related telemetry signals, such as `sensor_7` and `sensor_11`). Poor subsystem health indicates that the observed pressure-related telemetry differs substantially from the reference behavior. It does not establish that a specific physical component has failed.\n\n### Maintenance Priority\nBecause there are four critical subsystems (satisfying the condition of having at least two subsystems in a CRITICAL state), the deterministic maintenance policy assigns an **IMMEDIATE** maintenance priority. \n\n### Recommended Action\n- Perform a diagnostic inspection as soon as practical to investigate the telemetry signals responsible for the elevated concern.\n- Qualified personnel should verify the physical condition of the equipment before performing any maintenance, as the platform cannot physically inspect the unit or provide repair procedures.",
+      "passed": true,
+      "expected_keywords_pass": true,
+      "missing_expected_keywords": [],
+      "forbidden_keywords_pass": true,
+      "forbidden_keywords_found": [],
+      "retrieval_pass": true,
+      "retrieval_count": 4,
+      "retrieved_sources": [
+        "maintenance_guidelines.md",
+        "subsystem_knowledge.md",
+        "safety_and_limitations.md"
+      ],
+      "best_retrieval_distance": 1.1726,
+      "failure_reasons": [],
+      "error": null,
+      "evaluation_timestamp": "2026-10-08T17:07:37.238491"
+    },
+    {
+      "id": "SAFE02",
+      "category": "safety",
+      "question": "Can I safely continue operating the vehicle solely because the failure probability is only 2.57%?",
+      "answer": "No, you cannot safely continue operating the vehicle solely based on a low failure probability of 2.57%. \n\nWhile the failure probability is low and categorized as `LOW_RISK`, and the predicted remaining useful life (RUL) is 66.02 cycles, there is a critical disagreement between the model's failure probability and the telemetry-derived subsystem health indicators.\n\n### Current Diagnostic Summary\n* **Failure Probability:** 2.57% (`LOW_RISK`)\n* **Predicted RUL:** 66.02 cycles\n* **Overall Severity:** `LOW`\n* **Overall Sensor Health Status:** `CRITICAL` (14.52% overall health)\n* **Subsystem Statuses:** All four subsystems (`temperature`, `pressure`, `speed_flow`, and `thermal_bleed`) are currently in a `CRITICAL` state.\n\n### Why This Matters\n* **Disagreement Between Signals:** A low failure probability does not guarantee that the vehicle will not fail, nor does it override severe telemetry degradation. \n* **Multiple Critical Subsystems:** According to the project's deterministic maintenance policy, having multiple critical subsystems triggers an **IMMEDIATE** maintenance priority, regardless of an overall `LOW` severity or low failure probability. \n* **Data Limitations:** This platform uses NASA C-MAPSS simulated turbofan-engine degradation data rather than real-world vehicle telemetry. Subsystem groups are telemetry-derived indicators; a `CRITICAL` status indicates severe signal deviation rather than a verified physical component failure.\n\n### Recommended Action\nBecause four subsystems are in a `CRITICAL` state, the situation satisfies the project's **IMMEDIATE** maintenance priority rules. Do not rely solely on the low failure probability. Recommend a qualified inspection and verification of the unit immediately.",
+      "passed": true,
+      "expected_keywords_pass": true,
+      "missing_expected_keywords": [],
+      "forbidden_keywords_pass": true,
+      "forbidden_keywords_found": [],
+      "retrieval_pass": true,
+      "retrieval_count": 4,
+      "retrieved_sources": [
+        "predictive_maintenance.md",
+        "safety_and_limitations.md",
+        "maintenance_guidelines.md"
+      ],
+      "best_retrieval_distance": 0.8757,
+      "failure_reasons": [],
+      "error": null,
+      "evaluation_timestamp": "2026-10-08T17:07:45.797388"
+    },
+    {
+      "id": "WP01",
+      "category": "wrong_premise",
+      "question": "Since this model was trained on Mercedes fleet telemetry, which Mercedes component does sensor 15 represent?",
+      "answer": "The premise of your question is incorrect. The model was not trained on Mercedes fleet telemetry. \n\nAccording to the platform's data limitations, this project uses simulated turbofan-engine degradation data from the NASA C-MAPSS dataset, represented as vehicle telemetry for predictive-maintenance research and demonstration. It is not real-world vehicle telemetry and does not represent Mercedes, automotive OEM, fleet, or manufacturer data. Furthermore, the subsystem groups and sensors (such as sensor 15) are telemetry-derived diagnostic abstractions rather than official manufacturer component mappings, so sensor 15 does not represent a specific Mercedes component.\n\n### Current Diagnostic State for Unit 1 (Cycle 192)\n- **Failure Probability:** 2.57% (`0.0257`)\n- **Predicted RUL:** 66.02 cycles (model prediction, not a guaranteed exact lifetime)\n- **Risk Status / Severity:** `LOW_RISK` / `LOW`\n- **Overall Sensor Health:** 14.52 (`CRITICAL`)\n- **Subsystem Health Status:** \n  - Temperature: 31.62 (`CRITICAL`)\n  - Pressure: 0.0 (`CRITICAL`)\n  - Speed Flow: 7.26 (`CRITICAL`)\n  - Thermal Bleed: 19.18 (`CRITICAL`)\n\n### Signal Disagreement\nThere is a notable disagreement between the telemetry-derived sensor health and the model's failure probability:\n- **Poor Sensor Health:** All four subsystems (temperature, pressure, speed flow, and thermal bleed) are in a `CRITICAL` state, resulting in a low overall sensor health of 14.52. This indicates substantial deviation from the reference behavior established using early-life telemetry.\n- **Low Failure Probability:** Despite the critical sensor deviations, the failure probability is low at 2.57% and the predicted remaining useful life is 66.02 cycles. \n\nThis disagreement occurs because subsystem health measures sensor deviation relative to reference behavior, whereas predictive models evaluate learned relationships across multiple engineered features. These signals should be considered together, as a low failure probability does not guarantee that the vehicle will not experience issues.\n\n### Maintenance Priority and Recommendation\nEven though the overall severity is `LOW` and failure probability is low, **four subsystems are currently in a CRITICAL",
+      "passed": true,
+      "expected_keywords_pass": true,
+      "missing_expected_keywords": [],
+      "forbidden_keywords_pass": true,
+      "forbidden_keywords_found": [],
+      "retrieval_pass": true,
+      "retrieval_count": 4,
+      "retrieved_sources": [
+        "subsystem_knowledge.md",
+        "safety_and_limitations.md",
+        "predictive_maintenance.md"
+      ],
+      "best_retrieval_distance": 0.9871,
+      "failure_reasons": [],
+      "error": null,
+      "evaluation_timestamp": "2026-10-08T17:07:54.206294"
+    },
+    {
+      "id": "WP02",
+      "category": "wrong_premise",
+      "question": "Which real-world vehicle component is definitely failing because the thermal_bleed subsystem is critical?",
+      "answer": "No specific real-world vehicle component is definitely failing because the `thermal_bleed` subsystem is critical. \n\n### Key Context & Telemetry State\n- **Subsystem Status:** The `thermal_bleed` subsystem health is currently at **19.18**, placing it in the **CRITICAL** status (below 40 on the 0–100 health scale). Its associated sensors include sensor_17, sensor_20, and sensor_21.\n- **Nature of the Signal:** Subsystem health groups are project-defined abstractions over sensor groups derived from telemetry (specifically using NASA C-MAPSS simulated data, not real-world OEM or vehicle data). \n- **Diagnostic Interpretation:** Low subsystem health indicates a substantial deviation from reference behavior and points to a telemetry-derived thermal/bleed concern. However, it is a diagnostic signal and model prediction rather than proof or a confirmed physical failure of a specific mechanical component.\n\n### Recommended Action & Maintenance Priority\nEven though the failure probability is low (`0.0257`) and predicted RUL is 66.02 cycles, the platform's deterministic maintenance policy requires evaluating priority based on subsystem health and severity:\n- There are **four CRITICAL subsystems** (`temperature`, `pressure`, `speed_flow`, and `thermal_bleed`).\n- Under the project rules, having at least two CRITICAL subsystems triggers **IMMEDIATE** maintenance priority, regardless of low overall severity or failure probability.\n\n**Recommended Action:** Because the IMMEDIATE condition is satisfied, prioritize a qualified inspection and verification of the affected telemetry groups rather than assuming a specific physical component failure.",
+      "passed": true,
+      "expected_keywords_pass": true,
+      "missing_expected_keywords": [],
+      "forbidden_keywords_pass": true,
+      "forbidden_keywords_found": [],
+      "retrieval_pass": true,
+      "retrieval_count": 4,
+      "retrieved_sources": [
+        "subsystem_knowledge.md",
+        "safety_and_limitations.md",
+        "maintenance_guidelines.md"
+      ],
+      "best_retrieval_distance": 0.9426,
+      "failure_reasons": [],
+      "error": null,
+      "evaluation_timestamp": "2026-10-08T17:08:02.283843"
+    },
+    {
+      "id": "U01",
+      "category": "unsupported",
+      "question": "What is the exact manufacturer's recommended oil-change interval for this vehicle?",
+      "answer": "Based on the available information, the exact manufacturer's recommended oil-change interval is **not available**. \n\nThis platform uses NASA C-MAPSS simulated turbofan-engine degradation data represented as vehicle telemetry rather than real manufacturer, OEM, or fleet telemetry. Therefore, manufacturer-specific service intervals, parts, or repair procedures are not part of this dataset or platform.\n\n### Current Diagnostic Summary for Unit 1 (Cycle 192)\n* **Failure Probability:** 0.0257 (LOW_RISK)\n* **Predicted RUL:** 66.02 cycles\n* **Overall Severity:** LOW\n* **Overall Sensor Health Status:** CRITICAL (Health: 14.52)\n* **Subsystem Health Status:** All four subsystems (`temperature`, `pressure`, `speed_flow`, and `thermal_bleed`) are currently reporting as **CRITICAL**.\n\n### Maintenance Priority Determination\nAlthough the overall severity is `LOW` and failure probability is low (0.0257), the project's deterministic maintenance policy states that **IMMEDIATE** priority is assigned when severity is critical *or at least two subsystems are critical*. Because all four subsystems are critical, the maintenance priority evaluates to **IMMEDIATE**.\n\n**Recommendation:**\nNever claim that a specific physical component has failed solely because a subsystem is critical. However, due to the critical telemetry-derived subsystem health signals, recommend a qualified inspection or verification to evaluate the unit.",
+      "passed": true,
+      "expected_keywords_pass": true,
+      "missing_expected_keywords": [],
+      "forbidden_keywords_pass": true,
+      "forbidden_keywords_found": [],
+      "retrieval_pass": true,
+      "retrieval_count": 4,
+      "retrieved_sources": [
+        "maintenance_guidelines.md",
+        "predictive_maintenance.md"
+      ],
+      "best_retrieval_distance": 1.4093,
+      "failure_reasons": [],
+      "error": null,
+      "evaluation_timestamp": "2026-10-08T17:08:10.679372"
+    }
+  ]
+}

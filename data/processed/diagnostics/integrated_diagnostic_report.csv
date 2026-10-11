@@ -1,0 +1,2 @@
+vehicle_id,cycle,failure_probability,risk_status,predicted_rul,severity,priority,temperature_health,pressure_health,speed_flow_health,thermal_bleed_health,overall_sensor_health,overall_health_status,maintenance_action
+27,154,0.9999953508377075,HIGH_RISK,1.9863622188568115,CRITICAL,IMMEDIATE,22.51,26.28,37.66,46.53,33.25,CRITICAL,Schedule immediate diagnostic inspection and assess whether the vehicle should remain in service.

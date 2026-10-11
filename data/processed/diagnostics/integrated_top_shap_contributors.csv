@@ -1,0 +1,11 @@
+feature,shap_value,absolute_shap
+cycle_progress,7.161035,7.161035
+cycle,0.5764741,0.5764741
+sensor_9_roll_std_20,0.32989782,0.32989782
+sensor_15_roll_mean_10,0.29983896,0.29983896
+sensor_14_roll_std_20,0.23307735,0.23307735
+sensor_2_roll_mean_5,0.2282944,0.2282944
+sensor_7_roll_std_20,0.20772018,0.20772018
+sensor_2_roll_mean_20,0.19142908,0.19142908
+sensor_11_slope_20,0.18598804,0.18598804
+sensor_11_roll_mean_5,0.180723,0.180723

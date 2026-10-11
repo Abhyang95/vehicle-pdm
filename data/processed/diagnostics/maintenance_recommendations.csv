@@ -1,0 +1,5 @@
+vehicle_id,cycle,severity,priority,subsystem,health,status,inspection,maintenance
+27,154,CRITICAL,IMMEDIATE,Temperature,22.51,CRITICAL,Inspect temperature-related telemetry and investigate abnormal thermal trends.,Perform thermal-system diagnostic inspection.
+27,154,CRITICAL,IMMEDIATE,Pressure,26.28,CRITICAL,Inspect pressure-related telemetry and investigate abnormal pressure trends.,Perform pressure-system diagnostic inspection.
+27,154,CRITICAL,IMMEDIATE,Speed / Flow,37.66,CRITICAL,Inspect speed and flow telemetry for abnormal variation or degradation.,Perform speed/flow-system diagnostic inspection.
+27,154,CRITICAL,IMMEDIATE,Thermal / Bleed,46.53,DEGRADED,Inspect thermal/bleed-related telemetry and investigate abnormal trends.,Perform thermal/bleed-system diagnostic inspection.

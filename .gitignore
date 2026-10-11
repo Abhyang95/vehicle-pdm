@@ -1,0 +1,77 @@
+﻿
+# Secrets and environment files
+.env
+.env.*
+!.env.example
+frontend/.env
+frontend/.env.*
+!frontend/.env.example
+
+# Python
+.venv/
+venv/
+__pycache__/
+*.py[cod]
+*.egg-info/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+installed-packages-local.txt
+
+# Node
+node_modules/
+frontend/node_modules/
+frontend/dist/
+
+
+
+# Editor and OS files
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db
+
+# Logs
+*.log
+# Large experimental models and training artifacts
+models/rul_random_forest.joblib
+models/random_forest_failure_risk.joblib
+data/processed/random_forest_rul_regressor.joblib
+data/processed/random_forest_classifier.joblib
+data/processed/xgboost_rul_regressor.joblib
+data/processed/xgboost_classifier.joblib
+
+# Training datasets and intermediate feature tables
+data/processed/train.parquet
+data/processed/validation.parquet
+data/processed/test.parquet
+data/processed/train_scaled.parquet
+data/processed/validation_scaled.parquet
+data/processed/test_scaled.parquet
+data/processed/splits/
+
+# Experimental plots and temporary files
+data/processed/*.png
+
+# Training-only feature table
+data/processed/fd001_train_features.parquet
+
+# Raw NASA datasets are not needed by the deployed API
+data/raw/cmapss/*
+!data/raw/cmapss/RUL_FD001.txt
+
+# Redundant model and local experiment files
+models/xgboost_failure_risk.joblib
+data/processed/feature_scaler.joblib
+data/processed/logistic_regression_classifier.joblib
+data/processed/rul_mean_baseline.joblib
+data/processed/xgboost_failure_threshold.joblib
+data/processed/predict_request.json
+data/processed/sensor_correlation.csv
+data/processed/sensor_statistics.csv
+
+# Raw archive not required by the deployed API
+data/raw/CMAPSSData.zip
+
+# Historical backup models are not used by live inference
+models/baseline_backup_20261009/

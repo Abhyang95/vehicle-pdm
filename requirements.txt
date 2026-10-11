@@ -1,0 +1,16 @@
+
+fastapi
+uvicorn[standard]
+python-multipart
+pydantic
+numpy
+pandas
+pyarrow
+joblib
+scikit-learn
+xgboost
+shap
+python-dotenv
+google-genai
+chromadb
+sentence-transformers

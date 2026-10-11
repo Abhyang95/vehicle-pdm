@@ -1,0 +1,2 @@
+unit,cycle,failure_probability,risk_status,predicted_rul,severity,priority,maintenance_action,suggested_inspection
+27,0,0.9999953508377075,HIGH_RISK,1.9863622188568115,CRITICAL,IMMEDIATE,Schedule immediate diagnostic inspection and assess whether the vehicle should remain in service.,"Inspect abnormal telemetry trends, temperature, pressure, and speed/flow signals."
