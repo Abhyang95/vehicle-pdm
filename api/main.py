@@ -3,6 +3,7 @@ from pathlib import Path
 from typing import List
 import numpy as np
 import pandas as pd
+import time
 from fastapi import FastAPI, HTTPException, UploadFile, File
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel, Field
@@ -1601,54 +1602,70 @@ def maintenance(
 # AI Vehicle Assistant
 # ============================================================
 
+
 @app.post("/assistant")
-def assistant(
-    request: AssistantRequest,
-):
-    """
-    Answer a vehicle-maintenance question using:
+def assistant(request: AssistantRequest):
+    request_started = time.perf_counter()
 
-    1. Active vehicle telemetry
-    2. ML diagnostic report
-    3. RAG knowledge
-    4. Gemini grounded explanation
-
-    IMPORTANT:
-
-    If session_id is supplied, the assistant uses the uploaded
-    replay telemetry.
-
-    Otherwise, it uses the built-in/demo vehicle telemetry.
-
-    The LLM explains the diagnostic state. It does not calculate
-    the underlying ML predictions itself.
-    """
+    print(
+        f"[assistant] Request started | unit={request.unit} "
+        f"| cycle={request.cycle} "
+        f"| session_id={request.session_id}",
+        flush=True,
+    )
 
     try:
-
         # ----------------------------------------------------
-        # Resolve the exact active telemetry source
+        # Load active vehicle / replay context
         # ----------------------------------------------------
+        stage_started = time.perf_counter()
 
-        vehicle_df, data_source = (
-            get_active_vehicle_context(
-                unit=request.unit,
-                session_id=request.session_id,
-                cycle=request.cycle,
-            )
+        print(
+            "[assistant] Loading vehicle context",
+            flush=True,
+        )
+
+        vehicle_df, data_source = get_active_vehicle_context(
+            unit=request.unit,
+            session_id=request.session_id,
+            cycle=request.cycle,
+        )
+
+        print(
+            "[assistant] Vehicle context loaded in "
+            f"{time.perf_counter() - stage_started:.2f}s "
+            f"| data_source={data_source} "
+            f"| rows={len(vehicle_df)}",
+            flush=True,
         )
 
         # ----------------------------------------------------
         # Build current diagnostic state
         # ----------------------------------------------------
+        stage_started = time.perf_counter()
 
-        report = build_diagnostic_report(
-            vehicle_df
+        print(
+            "[assistant] Starting diagnostic report",
+            flush=True,
+        )
+
+        report = build_diagnostic_report(vehicle_df)
+
+        print(
+            "[assistant] Diagnostic report completed in "
+            f"{time.perf_counter() - stage_started:.2f}s",
+            flush=True,
         )
 
         # ----------------------------------------------------
-        # Ask grounded AI assistant
+        # Generate grounded AI assistant response
         # ----------------------------------------------------
+        stage_started = time.perf_counter()
+
+        print(
+            "[assistant] Starting RAG + Gemini",
+            flush=True,
+        )
 
         result = answer_vehicle_question(
             question=request.question,
@@ -1656,61 +1673,87 @@ def assistant(
             top_k=4,
         )
 
-        # ----------------------------------------------------
-        # Return assistant response
-        # ----------------------------------------------------
+        print(
+            "[assistant] RAG + Gemini completed in "
+            f"{time.perf_counter() - stage_started:.2f}s",
+            flush=True,
+        )
 
-        return {
+        # ----------------------------------------------------
+        # Return response (existing response structure)
+        # ----------------------------------------------------
+        response = {
             "status": "success",
-            "unit": int(
-                report["unit"]
-            ),
-            "current_cycle": int(
-                report["current_cycle"]
-            ),
+            "unit": int(report["unit"]),
+            "current_cycle": int(report["current_cycle"]),
             "question": result["question"],
             "answer": result["answer"],
-            "diagnostic_state": result[
-                "diagnostic_state"
-            ],
+            "diagnostic_state": result["diagnostic_state"],
             "data_source": data_source,
             "sources": [
                 {
                     "source": item["source"],
                     "chunk_index": item["chunk_index"],
-                    "distance": round(
-                        float(item["distance"]),
-                        4,
-                    ),
+                    "distance": round(float(item["distance"]), 4),
                 }
-                for item in result[
-                    "retrieved_knowledge"
-                ]
+                for item in result["retrieved_knowledge"]
             ],
         }
 
-    except HTTPException:
+        print(
+            "[assistant] Request completed successfully in "
+            f"{time.perf_counter() - request_started:.2f}s",
+            flush=True,
+        )
+
+        return response
+
+    except HTTPException as exc:
+        print(
+            "[assistant] HTTP error after "
+            f"{time.perf_counter() - request_started:.2f}s "
+            f"| status={exc.status_code} "
+            f"| detail={exc.detail}",
+            flush=True,
+        )
         raise
 
     except ValueError as exc:
+        print(
+            "[assistant] Validation error after "
+            f"{time.perf_counter() - request_started:.2f}s "
+            f"| error={exc}",
+            flush=True,
+        )
         raise HTTPException(
             status_code=422,
             detail=str(exc),
         ) from exc
 
     except FileNotFoundError as exc:
+        print(
+            "[assistant] File error after "
+            f"{time.perf_counter() - request_started:.2f}s "
+            f"| error={exc}",
+            flush=True,
+        )
         raise HTTPException(
             status_code=500,
             detail=str(exc),
         ) from exc
 
     except Exception as exc:
+        print(
+            "[assistant] Unexpected error after "
+            f"{time.perf_counter() - request_started:.2f}s "
+            f"| error={type(exc).__name__}: {exc}",
+            flush=True,
+        )
         raise HTTPException(
             status_code=500,
-            detail=(
-                f"Assistant failed: {str(exc)}"
-            ),
+            detail=f"Assistant failed: {str(exc)}",
         ) from exc
+
 
 
 # ============================================================
