@@ -1,342 +1,171 @@
 
 from pathlib import Path
-from typing import List, Dict
+from typing import Dict, List
 
-import chromadb
-from sentence_transformers import SentenceTransformer
+from src.llm_client import get_client
 
-
-# ============================================================
-# Project configuration
-# ============================================================
 
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
-
-KNOWLEDGE_DIR = PROJECT_ROOT / "docs" / "knowledge"
 VECTORSTORE_DIR = PROJECT_ROOT / "data" / "vectorstore"
 
 COLLECTION_NAME = "vehicle_pdm_knowledge"
+STAGING_COLLECTION = "vehicle_pdm_knowledge_gemini_staging"
 
-# Small, lightweight embedding model suitable for local CPU inference.
-EMBEDDING_MODEL_NAME = "all-MiniLM-L6-v2"
-
-# Chunking configuration.
-CHUNK_SIZE = 900
-CHUNK_OVERLAP = 150
+EMBEDDING_MODEL_NAME = "gemini-embedding-001"
+EMBEDDING_DIMENSIONS = 768
 
 
-# ============================================================
-# Knowledge document loading
-# ============================================================
+def embed_documents(texts: List[str]) -> List[List[float]]:
+    """Embed existing knowledge chunks with Gemini."""
 
-def load_markdown_documents() -> List[Dict]:
-    """
-    Load all Markdown knowledge documents.
+    client = get_client()
+    embeddings = []
 
-    Returns:
-        List of dictionaries containing:
-        - source
-        - text
-    """
+    for index, text in enumerate(texts, start=1):
+        response = client.models.embed_content(
+            model=EMBEDDING_MODEL_NAME,
+            contents=text,
+            config={
+                "task_type": "RETRIEVAL_DOCUMENT",
+                "output_dimensionality": EMBEDDING_DIMENSIONS,
+            },
+        )
 
-    if not KNOWLEDGE_DIR.exists():
+        if not response.embeddings:
+            raise RuntimeError(
+                f"No embedding returned for chunk {index}."
+            )
+
+        values = response.embeddings[0].values
+
+        if len(values) != EMBEDDING_DIMENSIONS:
+            raise RuntimeError(
+                f"Chunk {index}: expected {EMBEDDING_DIMENSIONS} "
+                f"dimensions, received {len(values)}."
+            )
+
+        embeddings.append(list(values))
+
+        print(
+            f"[rag-ingestion] Embedded chunk "
+            f"{index}/{len(texts)}",
+            flush=True,
+        )
+
+    return embeddings
+
+
+def migrate_existing_chunks() -> None:
+    """Copy the existing chunks into a separate Gemini staging collection."""
+
+    import chromadb
+
+    if not VECTORSTORE_DIR.exists():
         raise FileNotFoundError(
-            f"Knowledge directory not found: {KNOWLEDGE_DIR}"
+            f"Vectorstore not found: {VECTORSTORE_DIR}"
         )
 
-    documents = []
-
-    for path in sorted(KNOWLEDGE_DIR.glob("*.md")):
-        text = path.read_text(
-            encoding="utf-8"
-        ).strip()
-
-        if not text:
-            continue
-
-        documents.append(
-            {
-                "source": path.name,
-                "text": text,
-            }
-        )
-
-    if not documents:
-        raise ValueError(
-            f"No Markdown knowledge documents found in {KNOWLEDGE_DIR}"
-        )
-
-    return documents
-
-
-# ============================================================
-# Markdown-aware chunking
-# ============================================================
-
-def split_text(
-    text: str,
-    chunk_size: int = CHUNK_SIZE,
-    chunk_overlap: int = CHUNK_OVERLAP,
-) -> List[str]:
-    """
-    Split text into overlapping chunks.
-
-    The splitter first attempts to preserve paragraph boundaries,
-    then falls back to character-based splitting for paragraphs
-    that exceed the configured chunk size.
-    """
-
-    if chunk_size <= 0:
-        raise ValueError("chunk_size must be greater than zero.")
-
-    if chunk_overlap < 0:
-        raise ValueError("chunk_overlap cannot be negative.")
-
-    if chunk_overlap >= chunk_size:
-        raise ValueError(
-            "chunk_overlap must be smaller than chunk_size."
-        )
-
-    paragraphs = [
-        paragraph.strip()
-        for paragraph in text.split("\n\n")
-        if paragraph.strip()
-    ]
-
-    chunks: List[str] = []
-    current = ""
-
-    for paragraph in paragraphs:
-
-        # Normal case: paragraph fits into current chunk.
-        if len(current) + len(paragraph) + 2 <= chunk_size:
-            if current:
-                current += "\n\n" + paragraph
-            else:
-                current = paragraph
-            continue
-
-        # Save current chunk before processing the large paragraph.
-        if current:
-            chunks.append(current.strip())
-
-        # If the paragraph itself is small enough, start a new chunk.
-        if len(paragraph) <= chunk_size:
-            current = paragraph
-            continue
-
-        # Large paragraph fallback.
-        start = 0
-
-        while start < len(paragraph):
-            end = min(
-                start + chunk_size,
-                len(paragraph),
-            )
-
-            piece = paragraph[start:end].strip()
-
-            if piece:
-                chunks.append(piece)
-
-            if end >= len(paragraph):
-                break
-
-            start = max(
-                end - chunk_overlap,
-                start + 1,
-            )
-
-        current = ""
-
-    if current:
-        chunks.append(current.strip())
-
-    return [
-        chunk
-        for chunk in chunks
-        if chunk
-    ]
-
-
-def build_chunks(
-    documents: List[Dict],
-) -> List[Dict]:
-    """
-    Convert source documents into embedding-ready chunks.
-
-    Each chunk contains:
-        - id
-        - text
-        - source
-        - chunk_index
-    """
-
-    chunks = []
-
-    for document in documents:
-        source = document["source"]
-        text = document["text"]
-
-        document_chunks = split_text(text)
-
-        for index, chunk in enumerate(document_chunks):
-            chunks.append(
-                {
-                    "id": f"{source}:{index}",
-                    "text": chunk,
-                    "source": source,
-                    "chunk_index": index,
-                }
-            )
-
-    return chunks
-
-
-# ============================================================
-# ChromaDB
-# ============================================================
-
-def get_chroma_client():
-    """
-    Create a persistent ChromaDB client.
-    """
-
-    VECTORSTORE_DIR.mkdir(
-        parents=True,
-        exist_ok=True,
-    )
-
-    return chromadb.PersistentClient(
+    client = chromadb.PersistentClient(
         path=str(VECTORSTORE_DIR)
     )
 
+    # Read the original collection without modifying it.
+    original = client.get_collection(name=COLLECTION_NAME)
 
-def create_vectorstore(
-    chunks: List[Dict],
-):
-    """
-    Create or replace the project knowledge collection.
-    """
+    original_data = original.get(
+        include=["documents", "metadatas"]
+    )
 
-    client = get_chroma_client()
+    ids = original_data["ids"]
+    documents = original_data["documents"]
+    metadatas = original_data["metadatas"]
 
-    # Remove the previous collection if it exists.
-    try:
-        client.delete_collection(
-            name=COLLECTION_NAME
+    if not ids or not documents:
+        raise RuntimeError("Original knowledge collection is empty.")
+
+    if not (
+        len(ids) == len(documents) == len(metadatas)
+    ):
+        raise RuntimeError(
+            "Original collection returned inconsistent data lengths."
         )
+
+    if any(not doc or not doc.strip() for doc in documents):
+        raise RuntimeError(
+            "Original collection contains an empty document."
+        )
+
+    print(
+        f"[rag-ingestion] Original chunks: {len(documents)}",
+        flush=True,
+    )
+
+    embeddings = embed_documents(documents)
+
+    # Recreate only the staging collection.
+    # The original collection is never deleted or modified.
+    try:
+        client.delete_collection(name=STAGING_COLLECTION)
     except Exception:
         pass
 
-    collection = client.create_collection(
-        name=COLLECTION_NAME,
+    staging = client.create_collection(
+        name=STAGING_COLLECTION,
         metadata={
-            "description": (
-                "Vehicle Predictive Maintenance "
-                "knowledge base"
-            )
+            "embedding_model": EMBEDDING_MODEL_NAME,
+            "embedding_dimensions": EMBEDDING_DIMENSIONS,
         },
     )
 
-    embedding_model = SentenceTransformer(
-        EMBEDDING_MODEL_NAME
+    staging.add(
+        ids=ids,
+        documents=documents,
+        metadatas=metadatas,
+        embeddings=embeddings,
     )
 
-    texts = [
-        chunk["text"]
-        for chunk in chunks
-    ]
-
-    embeddings = embedding_model.encode(
-        texts,
-        show_progress_bar=True,
-        normalize_embeddings=True,
-    )
-
-    collection.add(
-        ids=[
-            chunk["id"]
-            for chunk in chunks
-        ],
-        documents=texts,
-        embeddings=embeddings.tolist(),
-        metadatas=[
-            {
-                "source": chunk["source"],
-                "chunk_index": chunk["chunk_index"],
-            }
-            for chunk in chunks
-        ],
-    )
-
-    return collection
-
-
-# ============================================================
-# Pipeline
-# ============================================================
-
-def build_knowledge_base():
-    """
-    Complete knowledge-base ingestion pipeline.
-    """
-
-    print("=" * 60)
-    print("VEHICLE PREDICTIVE MAINTENANCE RAG INGESTION")
-    print("=" * 60)
-
-    print(f"\nKnowledge directory:")
-    print(f"  {KNOWLEDGE_DIR}")
-
-    print(f"\nVectorstore directory:")
-    print(f"  {VECTORSTORE_DIR}")
-
-    print(f"\nEmbedding model:")
-    print(f"  {EMBEDDING_MODEL_NAME}")
-
-    print("\nLoading documents...")
-
-    documents = load_markdown_documents()
-
-    print(
-        f"Loaded {len(documents)} knowledge documents."
-    )
-
-    for document in documents:
-        print(
-            f"  - {document['source']}"
+    # Verify document and metadata preservation.
+    if staging.count() != len(documents):
+        raise RuntimeError(
+            "Staging collection count does not match original."
         )
 
-    print("\nBuilding chunks...")
+    check = staging.get(
+        include=["documents", "metadatas"]
+    )
 
-    chunks = build_chunks(
-        documents
+    original_by_id = {
+        item_id: (doc, meta)
+        for item_id, doc, meta in zip(ids, documents, metadatas)
+    }
+
+    staged_by_id = {
+        item_id: (doc, meta)
+        for item_id, doc, meta in zip(
+            check["ids"],
+            check["documents"],
+            check["metadatas"],
+        )
+    }
+
+    if original_by_id != staged_by_id:
+        raise RuntimeError(
+            "Staging verification failed: documents or metadata differ."
+        )
+
+    print(
+        f"[rag-ingestion] Migration verified | "
+        f"chunks={staging.count()} | "
+        f"dimensions={EMBEDDING_DIMENSIONS}",
+        flush=True,
     )
 
     print(
-        f"Created {len(chunks)} chunks."
+        f"[rag-ingestion] Original collection preserved: "
+        f"{COLLECTION_NAME}",
+        flush=True,
     )
 
-    print("\nCreating embeddings and vectorstore...")
-
-    collection = create_vectorstore(
-        chunks
-    )
-
-    print(
-        f"Stored {collection.count()} chunks "
-        f"in ChromaDB."
-    )
-
-    print("\nRAG ingestion completed successfully.")
-
-    return collection
-
-
-# ============================================================
-# CLI entry point
-# ============================================================
 
 if __name__ == "__main__":
-    build_knowledge_base()
+    migrate_existing_chunks()

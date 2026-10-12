@@ -4,6 +4,11 @@ from pathlib import Path
 from time import perf_counter
 from typing import Dict, List
 
+from google.genai import types
+
+from src.llm_client import get_client
+
+
 # ============================================================
 # Project configuration
 # ============================================================
@@ -12,9 +17,11 @@ PROJECT_ROOT = Path(__file__).resolve().parents[1]
 
 VECTORSTORE_DIR = PROJECT_ROOT / "data" / "vectorstore"
 
-COLLECTION_NAME = "vehicle_pdm_knowledge"
+# Use the staging collection created by the updated ingestion code.
+COLLECTION_NAME = "vehicle_pdm_knowledge_gemini_staging"
 
-EMBEDDING_MODEL_NAME = "all-MiniLM-L6-v2"
+EMBEDDING_MODEL_NAME = "gemini-embedding-001"
+EMBEDDING_DIMENSIONS = 768
 
 
 # ============================================================
@@ -22,13 +29,7 @@ EMBEDDING_MODEL_NAME = "all-MiniLM-L6-v2"
 # ============================================================
 
 class KnowledgeRetriever:
-    """
-    Retrieve relevant project knowledge from ChromaDB.
-
-    The retriever is independent from any LLM.
-    Its instance is cached so the embedding model and
-    ChromaDB client are not recreated for every request.
-    """
+    """Retrieve knowledge using Gemini embeddings and ChromaDB."""
 
     def __init__(
         self,
@@ -36,7 +37,6 @@ class KnowledgeRetriever:
         collection_name: str = COLLECTION_NAME,
     ):
         init_start = perf_counter()
-
         self.vectorstore_dir = Path(vectorstore_dir)
 
         print(
@@ -47,16 +47,8 @@ class KnowledgeRetriever:
 
         if not self.vectorstore_dir.exists():
             raise FileNotFoundError(
-                f"Vectorstore directory not found: "
-                f"{self.vectorstore_dir}"
+                f"Vectorstore directory not found: {self.vectorstore_dir}"
             )
-
-        # ----------------------------------------------------
-        # Initialize ChromaDB
-        # ----------------------------------------------------
-
-        chroma_start = perf_counter()
-        print("[rag] ChromaDB initialization started", flush=True)
 
         import chromadb
 
@@ -70,44 +62,27 @@ class KnowledgeRetriever:
             )
         except Exception as exc:
             raise RuntimeError(
-                f"ChromaDB collection '{collection_name}' "
-                "was not found. Run rag_ingestion.py first."
+                f"Collection '{collection_name}' not found. "
+                "Run and verify the local Gemini ingestion first."
             ) from exc
 
+        if self.collection.count() == 0:
+            raise RuntimeError(
+                f"Collection '{collection_name}' is empty."
+            )
+
         print(
-            f"[rag] ChromaDB initialized in "
-            f"{perf_counter() - chroma_start:.2f}s | "
-            f"collection={collection_name} | "
+            f"[rag] ChromaDB ready | collection={collection_name} | "
             f"chunks={self.collection.count()}",
             flush=True,
         )
 
-        # ----------------------------------------------------
-        # Load embedding model
-        # ----------------------------------------------------
-
-        model_start = perf_counter()
+        # No SentenceTransformer model is loaded here.
         print(
-            f"[rag] Embedding model loading started | "
-            f"model={EMBEDDING_MODEL_NAME}",
-            flush=True,
-        )
-
-        from sentence_transformers import SentenceTransformer
-
-        self.embedding_model = SentenceTransformer(
-            EMBEDDING_MODEL_NAME
-        )
-
-        print(
-            f"[rag] Embedding model loaded in "
-            f"{perf_counter() - model_start:.2f}s",
-            flush=True,
-        )
-
-        print(
-            f"[rag] Retriever initialization completed in "
-            f"{perf_counter() - init_start:.2f}s",
+            f"[rag] Using hosted embeddings | "
+            f"model={EMBEDDING_MODEL_NAME} | "
+            f"dimensions={EMBEDDING_DIMENSIONS} | "
+            f"initialized in {perf_counter() - init_start:.2f}s",
             flush=True,
         )
 
@@ -116,29 +91,40 @@ class KnowledgeRetriever:
     # ========================================================
 
     def embed_query(self, query: str) -> List[float]:
-        """Convert a user query into a normalized embedding."""
+        """Generate an embedding compatible with stored document vectors."""
 
         if not isinstance(query, str) or not query.strip():
             raise ValueError("Query must be a non-empty string.")
 
-        embedding_start = perf_counter()
+        started = perf_counter()
 
-        print("[rag] Query embedding started", flush=True)
-
-        embedding = self.embedding_model.encode(
-            query.strip(),
-            normalize_embeddings=True,
+        response = get_client().models.embed_content(
+            model=EMBEDDING_MODEL_NAME,
+            contents=query.strip(),
+            config=types.EmbedContentConfig(
+                task_type="RETRIEVAL_QUERY",
+                output_dimensionality=EMBEDDING_DIMENSIONS,
+            ),
         )
 
-        result = embedding.tolist()
+        if not response.embeddings:
+            raise RuntimeError("Gemini returned no query embedding.")
+
+        values = response.embeddings[0].values
+
+        if not values or len(values) != EMBEDDING_DIMENSIONS:
+            raise RuntimeError(
+                "Unexpected Gemini query embedding dimensions: "
+                f"{len(values) if values else 0}"
+            )
 
         print(
             f"[rag] Query embedding completed in "
-            f"{perf_counter() - embedding_start:.2f}s",
+            f"{perf_counter() - started:.2f}s",
             flush=True,
         )
 
-        return result
+        return list(values)
 
     # ========================================================
     # Retrieval
@@ -149,15 +135,7 @@ class KnowledgeRetriever:
         query: str,
         top_k: int = 4,
     ) -> List[Dict]:
-        """
-        Retrieve relevant knowledge chunks.
-
-        Each result contains:
-            - text
-            - source
-            - chunk_index
-            - distance
-        """
+        """Retrieve relevant knowledge chunks from ChromaDB."""
 
         if not isinstance(query, str) or not query.strip():
             raise ValueError("Query must be a non-empty string.")
@@ -169,39 +147,15 @@ class KnowledgeRetriever:
         ):
             raise ValueError("top_k must be a positive integer.")
 
-        retrieval_start = perf_counter()
-
-        # ----------------------------------------------------
-        # Embed query
-        # ----------------------------------------------------
-
+        started = perf_counter()
         query_embedding = self.embed_query(query)
 
-        # ----------------------------------------------------
-        # Query ChromaDB
-        # ----------------------------------------------------
-
-        chroma_query_start = perf_counter()
-
-        print(
-            f"[rag] ChromaDB query started | top_k={top_k}",
-            flush=True,
-        )
+        result_count = min(top_k, self.collection.count())
 
         results = self.collection.query(
             query_embeddings=[query_embedding],
-            n_results=top_k,
-            include=[
-                "documents",
-                "metadatas",
-                "distances",
-            ],
-        )
-
-        print(
-            f"[rag] ChromaDB query completed in "
-            f"{perf_counter() - chroma_query_start:.2f}s",
-            flush=True,
+            n_results=result_count,
+            include=["documents", "metadatas", "distances"],
         )
 
         documents = (results.get("documents") or [[]])[0] or []
@@ -211,24 +165,20 @@ class KnowledgeRetriever:
         retrieved = []
 
         for document, metadata, distance in zip(
-            documents,
-            metadatas,
-            distances,
+            documents, metadatas, distances
         ):
             metadata = metadata or {}
 
-            retrieved.append(
-                {
-                    "text": document,
-                    "source": metadata.get("source", "unknown"),
-                    "chunk_index": metadata.get("chunk_index", -1),
-                    "distance": round(float(distance), 4),
-                }
-            )
+            retrieved.append({
+                "text": document,
+                "source": metadata.get("source", "unknown"),
+                "chunk_index": metadata.get("chunk_index", -1),
+                "distance": round(float(distance), 4),
+            })
 
         print(
             f"[rag] Retrieval completed in "
-            f"{perf_counter() - retrieval_start:.2f}s | "
+            f"{perf_counter() - started:.2f}s | "
             f"results={len(retrieved)}",
             flush=True,
         )
@@ -242,15 +192,9 @@ class KnowledgeRetriever:
 
 @lru_cache(maxsize=1)
 def get_retriever() -> KnowledgeRetriever:
-    """
-    Initialize one retriever per process and reuse it.
-
-    If initialization fails, lru_cache does not cache the
-    failed call, so a later request can retry.
-    """
+    """Reuse one lightweight retriever per process."""
 
     print("[rag] Creating cached retriever", flush=True)
-
     return KnowledgeRetriever()
 
 
@@ -264,19 +208,7 @@ def retrieve_knowledge(
 ) -> List[Dict]:
     """Retrieve knowledge using the cached retriever."""
 
-    if not isinstance(query, str) or not query.strip():
-        raise ValueError("Query must be a non-empty string.")
-
-    if (
-        not isinstance(top_k, int)
-        or isinstance(top_k, bool)
-        or top_k < 1
-    ):
-        raise ValueError("top_k must be a positive integer.")
-
-    retriever = get_retriever()
-
-    return retriever.retrieve(
+    return get_retriever().retrieve(
         query=query,
         top_k=top_k,
     )
@@ -286,42 +218,18 @@ def retrieve_knowledge(
 # CLI testing
 # ============================================================
 
-def print_results(
-    query: str,
-    results: List[Dict],
-) -> None:
-    """Print retrieval results in a readable format."""
-
-    print("\n" + "=" * 70)
-    print("RAG RETRIEVAL TEST")
-    print("=" * 70)
-
-    print(f"\nQuery:\n{query}")
-    print(f"\nRetrieved chunks: {len(results)}")
-
-    for index, result in enumerate(results, start=1):
-        print("\n" + "-" * 70)
-        print(f"Result {index}")
-        print(f"Source: {result['source']}")
-        print(f"Chunk: {result['chunk_index']}")
-        print(f"Distance: {result['distance']}")
-        print("\nContent:")
-        print(result["text"])
-
-
 if __name__ == "__main__":
-    test_query = "What does critical subsystem health mean?"
+    test_queries = [
+        "What does critical subsystem health mean?",
+        "Why might predicted remaining useful life change?",
+    ]
 
-    # Run twice to verify that the cached retriever is reused.
-    for run_number in range(1, 3):
-        print(f"\n--- Retrieval run {run_number} ---")
+    for query in test_queries:
+        print(f"\nQuery: {query}")
 
-        results = retrieve_knowledge(
-            query=test_query,
-            top_k=4,
-        )
-
-        print_results(
-            query=test_query,
-            results=results,
-        )
+        for index, result in enumerate(
+            retrieve_knowledge(query, top_k=4), start=1
+        ):
+            print(f"\nResult {index}: {result['source']}")
+            print(f"Distance: {result['distance']}")
+            print(result["text"][:500])
