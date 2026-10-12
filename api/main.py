@@ -599,7 +599,8 @@ def build_replay_rul_history(
         # Causal prediction, health, and risk:
         # use only telemetry available through this cycle.
         historical_report = build_diagnostic_report(
-            truncated_df
+            truncated_df,
+            include_shap=False,
         )
 
         overall_health = float(

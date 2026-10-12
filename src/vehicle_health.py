@@ -4,6 +4,7 @@ from pathlib import Path
 import pandas as pd
 
 from src.diagnostic_report import build_diagnostic_report
+from src.inference import build_inference_features
 from src.subsystem_health import (
     LIVE_BASELINE_CYCLES,
     add_live_health_statuses,
@@ -52,16 +53,23 @@ def build_vehicle_health_history(
     """
     Build current vehicle health and recent health history.
 
-    Predictions use progressively larger telemetry prefixes.
+    Engineered features are calculated once for the complete
+    trajectory. Each historical prediction uses only the feature
+    rows through its corresponding cycle.
+
     Subsystem health is computed once for the full trajectory,
     with prefix-specific calculations retained before baseline
     completion.
-
-    Each diagnostic report uses only telemetry available through
-    its corresponding cycle.
     """
 
     vehicle_df = load_vehicle_history(unit)
+
+    # --------------------------------------------------------
+    # 1. Engineer features once
+    # --------------------------------------------------------
+    # Feature-equivalence tests verify that the row for a given
+    # cycle matches the row generated from that cycle's prefix.
+    vehicle_features = build_inference_features(vehicle_df)
 
     history_points = max(
         1,
@@ -94,43 +102,54 @@ def build_vehicle_health_history(
         ]
         selected_indices.append(last_index)
 
-    # Calculate the full trajectory's health scores once.
+    # --------------------------------------------------------
+    # 2. Calculate subsystem health once
+    # --------------------------------------------------------
     full_health = calculate_live_group_health(vehicle_df)
     full_health = add_live_health_statuses(full_health)
 
-    # Align health rows with the sorted telemetry rows.
+    # Align health rows with sorted telemetry rows.
     health_by_index = full_health.reset_index(drop=True)
 
+    # --------------------------------------------------------
+    # 3. Build historical predictions
+    # --------------------------------------------------------
     history = []
 
     for index in selected_indices:
-        # Only observations up to and including this cycle.
+        # Telemetry available through this cycle.
         telemetry_window = vehicle_df.iloc[
             : index + 1
         ].copy()
 
-        # Preserve prefix-specific health calibration before the
-        # initial baseline has been completed.
+        # Features through this cycle only. The diagnostic report
+        # predicts from the final row of this feature prefix.
+        feature_window = vehicle_features.iloc[
+            : index + 1
+        ]
+
         if index + 1 < LIVE_BASELINE_CYCLES:
             report = build_diagnostic_report(
                 telemetry_window,
                 include_shap=False,
+                precomputed_features_df=feature_window,
             )
         else:
-            # Reuse the health row for this exact observation.
-            # The diagnostic report still receives only the prefix.
             report = build_diagnostic_report(
                 telemetry_window,
                 include_shap=False,
                 precomputed_health_df=health_by_index.iloc[
                     [index]
                 ].reset_index(drop=True),
+                precomputed_features_df=feature_window,
             )
 
-        # Select the health scores corresponding to this cycle.
+        # ----------------------------------------------------
+        # 4. Select health scores for this cycle
+        # ----------------------------------------------------
         if index + 1 < LIVE_BASELINE_CYCLES:
-            # Before baseline completion, preserve the original
-            # behavior by calculating health from the short prefix.
+            # Preserve prefix-specific health behavior before
+            # the initial baseline has been completed.
             prefix_health = calculate_live_group_health(
                 telemetry_window
             )
@@ -139,8 +158,6 @@ def build_vehicle_health_history(
             )
             latest_health = prefix_health.iloc[-1]
         else:
-            # Reuse the precomputed health row after baseline
-            # completion to avoid recalculating the trajectory.
             latest_health = health_by_index.iloc[index]
 
         subsystem_history = {}
@@ -186,6 +203,9 @@ def build_vehicle_health_history(
             }
         )
 
+    # --------------------------------------------------------
+    # 5. Return the existing response structure
+    # --------------------------------------------------------
     current = history[-1]
 
     return {

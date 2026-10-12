@@ -210,33 +210,26 @@ def validate_model_schema(
         )
 
 
-def predict_from_telemetry(
-    telemetry: pd.DataFrame,
-) -> dict:
-    """
-    Predict failure probability and RUL using telemetry
-    available up to the latest supplied cycle.
 
-    The caller should provide telemetry only up to the
-    cycle being analyzed during replay.
+def predict_from_features(features_df: pd.DataFrame) -> dict:
     """
+    Predict from already-engineered features.
+
+    The supplied DataFrame must contain the feature row(s)
+    through the cycle being analyzed.
+    """
+    if features_df.empty:
+        raise ValueError("Feature input cannot be empty.")
+
     (
         failure_model,
         rul_model,
         feature_columns,
     ) = load_models()
 
-    features_df = build_inference_features(
-        telemetry
-    )
-
-    validate_model_schema(
-        features_df,
-        feature_columns,
-    )
+    validate_model_schema(features_df, feature_columns)
 
     latest_row = features_df.iloc[[-1]]
-
     X_latest = latest_row[feature_columns]
 
     failure_probability = float(
@@ -248,29 +241,26 @@ def predict_from_telemetry(
     )
 
     predicted_rul = float(
-        np.clip(
-            predicted_rul,
-            0,
-            MAX_RUL,
-        )
-    )
-
-    current_cycle = int(
-        latest_row["cycle"].iloc[0]
-    )
-
-    unit = int(
-        latest_row["unit"].iloc[0]
+        np.clip(predicted_rul, 0, MAX_RUL)
     )
 
     return {
-        "unit": unit,
-        "current_cycle": current_cycle,
+        "unit": int(latest_row["unit"].iloc[0]),
+        "current_cycle": int(latest_row["cycle"].iloc[0]),
         "failure_probability": failure_probability,
         "predicted_rul": predicted_rul,
         "feature_count": len(feature_columns),
         "leakage_free": True,
     }
+
+
+def predict_from_telemetry(telemetry: pd.DataFrame) -> dict:
+    """
+    Predict using telemetry available up to the latest cycle.
+    """
+    features_df = build_inference_features(telemetry)
+    return predict_from_features(features_df)
+
 
 
 def compare_replay_consistency(

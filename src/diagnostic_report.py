@@ -11,6 +11,7 @@ from src.inference import (
     FAILURE_FEATURES_PATH,
     FAILURE_MODEL_PATH,
     build_inference_features,
+    predict_from_features,
     predict_from_telemetry,
 )
 from src.subsystem_health import (
@@ -180,6 +181,7 @@ def build_diagnostic_report(
     top_k_shap: int = SHAP_TOP_K,
     include_shap: bool = True,
     precomputed_health_df: pd.DataFrame | None = None,
+    precomputed_features_df: pd.DataFrame | None = None,
 ) -> dict:
 
     if telemetry_df.empty:
@@ -199,9 +201,14 @@ def build_diagnostic_report(
     # 1. ML prediction
     # --------------------------------------------------------
 
-    prediction = predict_from_telemetry(
-        telemetry_df
-    )
+    if precomputed_features_df is not None:
+        prediction = predict_from_features(
+            precomputed_features_df
+        )
+    else:
+        prediction = predict_from_telemetry(
+            telemetry_df
+        )
 
     failure_probability = float(
         prediction["failure_probability"]
