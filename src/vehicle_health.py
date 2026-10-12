@@ -1,9 +1,14 @@
+
 from pathlib import Path
 
 import pandas as pd
 
 from src.diagnostic_report import build_diagnostic_report
-from src.subsystem_health import calculate_live_group_health
+from src.subsystem_health import (
+    LIVE_BASELINE_CYCLES,
+    add_live_health_statuses,
+    calculate_live_group_health,
+)
 
 
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
@@ -17,9 +22,7 @@ LABELED_DATA_PATH = (
 
 
 def load_vehicle_history(unit: int) -> pd.DataFrame:
-    """
-    Load historical telemetry for one vehicle/unit.
-    """
+    """Load historical telemetry for one vehicle/unit."""
 
     if not LABELED_DATA_PATH.exists():
         raise FileNotFoundError(
@@ -49,8 +52,13 @@ def build_vehicle_health_history(
     """
     Build current vehicle health and recent health history.
 
-    Historical points are generated from progressively larger
-    telemetry windows using the existing diagnostic pipeline.
+    Predictions use progressively larger telemetry prefixes.
+    Subsystem health is computed once for the full trajectory,
+    with prefix-specific calculations retained before baseline
+    completion.
+
+    Each diagnostic report uses only telemetry available through
+    its corresponding cycle.
     """
 
     vehicle_df = load_vehicle_history(unit)
@@ -66,49 +74,92 @@ def build_vehicle_health_history(
     )
 
     selected_indices = list(
-        range(
-            0,
-            len(vehicle_df),
-            step,
-        )
+        range(0, len(vehicle_df), step)
     )
 
     last_index = len(vehicle_df) - 1
 
-    # Always include the latest telemetry observation.
+    # Always include the latest cycle.
     selected_indices = [
         index
         for index in selected_indices
         if index != last_index
     ]
 
-    selected_indices = selected_indices[
-        -(history_points - 1):
-    ]
+    if history_points == 1:
+        selected_indices = [last_index]
+    else:
+        selected_indices = selected_indices[
+            -(history_points - 1):
+        ]
+        selected_indices.append(last_index)
 
-    selected_indices.append(last_index)
+    # Calculate the full trajectory's health scores once.
+    full_health = calculate_live_group_health(vehicle_df)
+    full_health = add_live_health_statuses(full_health)
+
+    # Align health rows with the sorted telemetry rows.
+    health_by_index = full_health.reset_index(drop=True)
 
     history = []
 
     for index in selected_indices:
-
+        # Only observations up to and including this cycle.
         telemetry_window = vehicle_df.iloc[
             : index + 1
         ].copy()
 
-        report = build_diagnostic_report(
-            telemetry_window,
-            include_shap=False,
-        )
+        # Preserve prefix-specific health calibration before the
+        # initial baseline has been completed.
+        if index + 1 < LIVE_BASELINE_CYCLES:
+            report = build_diagnostic_report(
+                telemetry_window,
+                include_shap=False,
+            )
+        else:
+            # Reuse the health row for this exact observation.
+            # The diagnostic report still receives only the prefix.
+            report = build_diagnostic_report(
+                telemetry_window,
+                include_shap=False,
+                precomputed_health_df=health_by_index.iloc[
+                    [index]
+                ].reset_index(drop=True),
+            )
 
-        subsystem_history = {
-            name: {
-                "health": details["health"],
-                "status": details["status"],
+        # Select the health scores corresponding to this cycle.
+        if index + 1 < LIVE_BASELINE_CYCLES:
+            # Before baseline completion, preserve the original
+            # behavior by calculating health from the short prefix.
+            prefix_health = calculate_live_group_health(
+                telemetry_window
+            )
+            prefix_health = add_live_health_statuses(
+                prefix_health
+            )
+            latest_health = prefix_health.iloc[-1]
+        else:
+            # Reuse the precomputed health row after baseline
+            # completion to avoid recalculating the trajectory.
+            latest_health = health_by_index.iloc[index]
+
+        subsystem_history = {}
+
+        for name in (
+            "temperature",
+            "pressure",
+            "speed_flow",
+            "thermal_bleed",
+        ):
+            subsystem_history[name] = {
+                "health": round(
+                    float(latest_health[f"{name}_health"]),
+                    2,
+                ),
+                "status": str(
+                    latest_health[f"{name}_status"]
+                ),
             }
-            for name, details
-            in report["subsystem_health"].items()
-        }
 
         history.append(
             {
@@ -123,11 +174,13 @@ def build_vehicle_health_history(
                 ),
                 "severity": report["severity"],
                 "overall_sensor_health": round(
-                    report["overall_sensor_health"],
+                    float(
+                        latest_health["overall_sensor_health"]
+                    ),
                     2,
                 ),
-                "overall_health_status": (
-                    report["overall_health_status"]
+                "overall_health_status": str(
+                    latest_health["overall_health_status"]
                 ),
                 "subsystem_health": subsystem_history,
             }
@@ -138,12 +191,8 @@ def build_vehicle_health_history(
     return {
         "unit": unit,
         "current_cycle": current["cycle"],
-        "failure_probability": current[
-            "failure_probability"
-        ],
-        "predicted_rul": current[
-            "predicted_rul"
-        ],
+        "failure_probability": current["failure_probability"],
+        "predicted_rul": current["predicted_rul"],
         "severity": current["severity"],
         "overall_sensor_health": current[
             "overall_sensor_health"
@@ -151,8 +200,6 @@ def build_vehicle_health_history(
         "overall_health_status": current[
             "overall_health_status"
         ],
-        "subsystem_health": current[
-            "subsystem_health"
-        ],
+        "subsystem_health": current["subsystem_health"],
         "history": history,
     }

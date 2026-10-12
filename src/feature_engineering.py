@@ -120,144 +120,101 @@ def validate_feature_input(df: pd.DataFrame) -> None:
 # Rolling features
 # ============================================================
 
-def add_rolling_features(
-    df: pd.DataFrame,
-) -> pd.DataFrame:
-    """
-    Add causal rolling mean and rolling standard deviation.
 
-    Every feature at cycle t uses only observations at cycles
-    <= t for the same unit.
 
-    min_periods=1 for means allows inference from short replay
-    histories.
-
-    min_periods=2 for standard deviation avoids treating a
-    single observation as a meaningful variance estimate.
-    """
-
+def add_rolling_features(df: pd.DataFrame) -> pd.DataFrame:
+    """Add causal rolling features per unit with batched column insertion."""
     result = df.copy()
-
-    grouped = result.groupby(
-        "unit",
-        sort=False,
-    )
+    feature_data = {}
 
     for sensor in SENSOR_COLUMNS:
+        grouped = result.groupby("unit", sort=False)[sensor]
 
         for window in ROLLING_WINDOWS:
+            rolling = grouped.rolling(window=window, min_periods=1)
 
-            mean_column = (
-                f"{sensor}_roll_mean_{window}"
+            feature_data[f"{sensor}_roll_mean_{window}"] = (
+                rolling.mean()
+                .reset_index(level=0, drop=True)
+                .reindex(result.index)
             )
 
-            std_column = (
-                f"{sensor}_roll_std_{window}"
-            )
-
-            result[mean_column] = (
-                grouped[sensor]
-                .rolling(
-                    window=window,
-                    min_periods=1,
-                )
-                .mean()
-                .reset_index(
-                    level=0,
-                    drop=True,
-                )
-            )
-
-            result[std_column] = (
-                grouped[sensor]
-                .rolling(
-                    window=window,
-                    min_periods=2,
-                )
+            feature_data[f"{sensor}_roll_std_{window}"] = (
+                grouped.rolling(window=window, min_periods=2)
                 .std()
-                .reset_index(
-                    level=0,
-                    drop=True,
-                )
+                .reset_index(level=0, drop=True)
+                .reindex(result.index)
                 .fillna(0.0)
             )
 
-    return result
+    rolling_features = pd.DataFrame(feature_data, index=result.index)
+    return pd.concat([result, rolling_features], axis=1)
+
+
 
 
 # ============================================================
 # Slope features
 # ============================================================
 
+
 def calculate_slope(
     values: np.ndarray,
 ) -> float:
-    """
-    Calculate the linear slope of a short historical window.
+    """Calculate the linear-regression slope for equally spaced observations."""
 
-    The caller supplies only observations available up to the
-    current cycle, so this is a causal feature.
-    """
+    n = len(values)
 
-    if len(values) < 2:
+    if n < 2:
         return 0.0
 
-    x = np.arange(
-        len(values),
-        dtype=float,
+    centered_x = (
+        np.arange(n, dtype=float)
+        - (n - 1) / 2.0
     )
 
-    return float(
-        np.polyfit(
-            x,
-            values,
-            1,
-        )[0]
+    denominator = float(
+        np.dot(centered_x, centered_x)
     )
+
+    if denominator == 0.0:
+        return 0.0
+
+    return float(
+        np.dot(centered_x, values) / denominator
+    )
+
+
+
 
 
 def add_slope_features(
     df: pd.DataFrame,
 ) -> pd.DataFrame:
-    """
-    Add causal rolling slope features.
-
-    For each sensor and window, the slope at cycle t is
-    calculated only from the latest observations through t.
-    """
-
+    """Add causal rolling slope features."""
     result = df.copy()
 
     for sensor in SENSOR_COLUMNS:
-
         for window in ROLLING_WINDOWS:
-
-            column = (
-                f"{sensor}_slope_{window}"
-            )
+            column = f"{sensor}_slope_{window}"
 
             result[column] = (
-                result.groupby(
-                    "unit",
-                    sort=False,
-                )[sensor]
+                result.groupby("unit", sort=False)[sensor]
                 .transform(
                     lambda series: (
-                        series
-                        .rolling(
+                        series.rolling(
                             window=window,
                             min_periods=2,
                         )
-                        .apply(
-                            calculate_slope,
-                            raw=True,
-                        )
+                        .apply(calculate_slope, raw=True)
                         .fillna(0.0)
                     )
                 )
             )
 
     return result
+
+
 
 
 # ============================================================

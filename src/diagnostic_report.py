@@ -1,5 +1,5 @@
-from __future__ import annotations
-
+﻿from __future__ import annotations
+from functools import lru_cache
 import json
 from pathlib import Path
 
@@ -98,7 +98,7 @@ def determine_severity(
 # ============================================================
 # Load current model feature schema
 # ============================================================
-
+@lru_cache(maxsize=1)
 def load_failure_feature_columns() -> list[str]:
     """
     Load the feature schema saved alongside the current
@@ -161,7 +161,15 @@ def load_failure_feature_columns() -> list[str]:
         )
 
     return feature_columns
+@lru_cache(maxsize=1)
+def load_failure_model():
+    if not FAILURE_MODEL_PATH.exists():
+        raise FileNotFoundError(
+            "Failure-risk model not found: "
+            f"{FAILURE_MODEL_PATH}"
+        )
 
+    return joblib.load(FAILURE_MODEL_PATH)
 
 # ============================================================
 # Build complete diagnostic report
@@ -171,6 +179,7 @@ def build_diagnostic_report(
     telemetry_df: pd.DataFrame,
     top_k_shap: int = SHAP_TOP_K,
     include_shap: bool = True,
+    precomputed_health_df: pd.DataFrame | None = None,
 ) -> dict:
 
     if telemetry_df.empty:
@@ -212,70 +221,40 @@ def build_diagnostic_report(
     )
 
     # --------------------------------------------------------
-    # 2. Build inference features
+    # 2–5. SHAP explanation (only when requested)
     # --------------------------------------------------------
 
-    inference_features = (
-        build_inference_features(
-            telemetry_df
-        )
-    )
-
-    # --------------------------------------------------------
-    # 3. Load current failure-risk model
-    # --------------------------------------------------------
-
-    if not FAILURE_MODEL_PATH.exists():
-        raise FileNotFoundError(
-            "Failure-risk model not found: "
-            f"{FAILURE_MODEL_PATH}"
-        )
-
-    # Current artifacts store the XGBClassifier directly.
-    # They are NOT the older {'model': ..., ...} bundle format.
-    failure_model = joblib.load(
-        FAILURE_MODEL_PATH
-    )
-
-    feature_columns = (
-        load_failure_feature_columns()
-    )
-
-    # --------------------------------------------------------
-    # 4. Validate feature alignment
-    # --------------------------------------------------------
-
-    missing_features = [
-        column
-        for column in feature_columns
-        if column not in inference_features.columns
-    ]
-
-    if missing_features:
-        raise ValueError(
-            "Missing engineered model features: "
-            + ", ".join(missing_features)
-        )
-
-    X = inference_features[
-        feature_columns
-    ].copy()
-
-    if X.shape[1] != EXPECTED_FEATURE_COUNT:
-        raise ValueError(
-            "Diagnostic SHAP input contains "
-            f"{X.shape[1]} features. "
-            f"Expected {EXPECTED_FEATURE_COUNT}."
-        )
-
-
-    # --------------------------------------------------------
-    # 5. SHAP explanation
-    # --------------------------------------------------------
-
+    feature_columns = load_failure_feature_columns()
     shap_contributors = []
 
     if include_shap:
+        inference_features = build_inference_features(
+            telemetry_df
+        )
+
+        failure_model = load_failure_model()
+
+        missing_features = [
+            column
+            for column in feature_columns
+            if column not in inference_features.columns
+        ]
+
+        if missing_features:
+            raise ValueError(
+                "Missing engineered model features: "
+                + ", ".join(missing_features)
+            )
+
+        X = inference_features[feature_columns].copy()
+
+        if X.shape[1] != EXPECTED_FEATURE_COUNT:
+            raise ValueError(
+                "Diagnostic SHAP input contains "
+                f"{X.shape[1]} features. "
+                f"Expected {EXPECTED_FEATURE_COUNT}."
+            )
+
         shap_df = explain_prediction(
             failure_model,
             X,
@@ -294,21 +273,16 @@ def build_diagnostic_report(
                     "description": str(row["feature"]),
                 }
             )
+
     # --------------------------------------------------------
     # 6. Live subsystem health
     # --------------------------------------------------------
 
-    health_df = (
-        calculate_live_group_health(
-            telemetry_df
-        )
-    )
-
-    health_df = (
-        add_live_health_statuses(
-            health_df
-        )
-    )
+    if precomputed_health_df is None:
+        health_df = calculate_live_group_health(telemetry_df)
+        health_df = add_live_health_statuses(health_df)
+    else:
+        health_df = precomputed_health_df
 
     latest_health = health_df.iloc[-1]
 
